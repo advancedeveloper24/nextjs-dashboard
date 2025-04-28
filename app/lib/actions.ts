@@ -1,6 +1,11 @@
 "use server";
 
 import { z } from "zod";
+import postgres from "postgres";
+import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
+
+const sql = postgres(process.env.POSTGRES_URL!, { ssl: "require" });
 
 const FormSchema = z.object({
   id: z.string(),
@@ -18,4 +23,14 @@ export async function createInvoice(formData: FormData) {
     amount: formData.get("amount"),
     status: formData.get("status"),
   });
+  const amountInCents = amount * 100;
+  const date = new Date().toISOString().split("T")[0];
+
+  await sql`
+  INSERT INTO invoices ( customer_id, amount, status, date )
+  VALUES (${customerId}, ${amountInCents}, ${status}, ${date})
+  `;
+
+  revalidatePath("/dashbaord/invoices");
+  redirect("/dashboard/invoices");
 }
